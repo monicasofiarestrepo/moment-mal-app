@@ -31,6 +31,8 @@ data class SessionConfig(
     val maxRepeats: Int = 2,
     /** Direct mode: an "Again" card returns after this many other items. */
     val repeatGap: Int = 4,
+    /** Share of new cards taken from the easiest remaining difficulty level. */
+    val easiestFirstShare: Double = 0.75,
 )
 
 enum class ItemKind { FLIP, MCQ }
@@ -155,12 +157,22 @@ class SessionEngine(
         // 3) new cards (daily cap)
         val fresh = cands.filter { (st(it)?.reps ?: 0) == 0 }
         if (newToday < config.newCardsPerDay && fresh.isNotEmpty()) {
-            return make(fresh.random(rnd), mcq = false, repeat = false)
+            return make(pickNew(fresh), mcq = false, repeat = false)
         }
         // 4) fallback: weakest known cards, otherwise anything
         val known = cands.filter { (st(it)?.reps ?: 0) > 0 }.sortedBy { st(it)!!.stability }.take(10)
         val pick = if (known.isNotEmpty()) known.random(rnd) else cands.random(rnd)
         return make(pick, mcq = false, repeat = false)
+    }
+
+    /**
+     * New cards ramp up in difficulty: usually (75 %) one of the easiest unseen ones,
+     * sometimes any unseen card so harder material also appears early.
+     */
+    private fun pickNew(fresh: List<CardDef>): CardDef {
+        val easiest = fresh.minOf { it.stufe ?: 2 }
+        return if (rnd.nextDouble() < config.easiestFirstShare) fresh.filter { (it.stufe ?: 2) == easiest }.random(rnd)
+        else fresh.random(rnd)
     }
 
     private fun make(card: CardDef, mcq: Boolean, repeat: Boolean): SessionItem? {

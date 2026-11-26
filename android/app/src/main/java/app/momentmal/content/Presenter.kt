@@ -94,6 +94,14 @@ class Presenter(private val catalog: Catalog) {
                     back = clozeBack(c, n.notes),
                 )
             }
+            is GrammatikFrage -> Flashcard(
+                front = listOf(label("Grammatik · ${n.thema}"), Block(n.frage, BlockStyle.BIG)),
+                back = buildList {
+                    add(Block(n.antwort, BlockStyle.BODY))
+                    n.beispiel?.let { addExample(it) }
+                    n.notes?.let { add(Block(it, BlockStyle.HINT)) }
+                },
+            )
             is Lesetext -> {
                 val f = card.frage!!
                 Flashcard(
@@ -195,6 +203,7 @@ class Presenter(private val catalog: Catalog) {
                 val f = card.frage!!
                 build(flash.front, f.antwort, f.distractors, flash.back, rnd)
             }
+            is GrammatikFrage -> build(flash.front, n.kurz, n.distractors, flash.back, rnd)
         }
     }
 

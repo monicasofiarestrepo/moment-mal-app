@@ -59,9 +59,9 @@ class ContentSyncTest {
     @Test fun downloadsValidatesAndInstalls() {
         val r = sync()
         assertTrue(r.updated)
-        assertEquals(300, r.notes)
+        assertEquals(800, r.notes)
         val installed = Catalog.load { File(dir, it).readText() }
-        assertEquals(3, installed.decks.size)
+        assertEquals(5, installed.decks.size)
     }
 
     @Test fun skipsWhenVersionNotNewer() {

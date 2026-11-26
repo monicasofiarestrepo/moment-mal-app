@@ -38,6 +38,10 @@
             android:windowSoftInputMode="adjustResize" />
 
         <receiver
+            android:name=".blocker.NoteCopyReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".blocker.AdminReceiver"
             android:exported="true"
             android:label="@string/app_name"

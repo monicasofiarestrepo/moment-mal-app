@@ -29,13 +29,23 @@ class CoreTest {
     private val day = Fsrs.DAY
 
     @Test fun parsesAllDecks() {
-        assertEquals(listOf("deutsch", "systemdesign", "interview"), catalog.decks.map { it.id })
-        assertEquals(200, catalog.byDeck["deutsch"]!!.map { it.noteId }.distinct().size)
-        assertEquals(50, catalog.byDeck["systemdesign"]!!.size)
-        assertEquals(50, catalog.byDeck["interview"]!!.size)
+        assertEquals(listOf("deutsch", "systemdesign", "interview", "dev", "pm"), catalog.decks.map { it.id })
+        assertEquals(400, catalog.byDeck["deutsch"]!!.map { it.noteId }.distinct().size)
+        for (d in listOf("systemdesign", "interview", "dev", "pm")) assertEquals(d, 100, catalog.byDeck[d]!!.size)
         // every noun has an #artikel card
-        assertEquals(45, catalog.cards.count { it is DeCard && it.direction == "artikel" })
+        val nouns = catalog.cards.filterIsInstance<DeCard>().filter { it.note is app.momentmal.content.Nomen }.map { it.noteId }.distinct().size
+        assertEquals(nouns, catalog.cards.count { it is DeCard && it.direction == "artikel" })
         assertEquals(catalog.cards.size, catalog.byId.size) // ids unique
+        assertTrue("every note has a stufe", catalog.cards.all { it.stufe in 1..3 })
+    }
+
+    @Test fun newCardsStartEasy() {
+        var easy = 0; var total = 0
+        repeat(100) { seed ->
+            val e = engine(SessionMode.Direct("deutsch"), seed = seed)
+            repeat(5) { e.next()?.let { total++; if (it.card.stufe == 1) easy++ } }
+        }
+        assertTrue("mostly stufe 1 at the start: $easy/$total", easy.toDouble() / total > 0.7)
     }
 
     @Test fun everyCardRendersAndMostHaveMcq() {

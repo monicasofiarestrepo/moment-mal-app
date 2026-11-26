@@ -324,6 +324,13 @@ Ejemplos:
 
 ---
 
+## 12b. Contenido v2
+
+- 800 notas: Deutsch 400 (A2→B2, incl. `grammatik_frage` para conceptos como Dativ/Akkusativ y 55 oraciones completas), Systemdesign 100, Interviewfragen 100, **Dev** 100 (frontend, backend, UI) y **Produktmanagement** 100 (discovery, estrategia, métricas, UX, delivery, comunicación).
+- Cada nota tiene `stufe` (1 leicht · 2 mittel · 3 schwer). Las tarjetas nuevas se introducen de fácil a difícil (75 % del nivel más fácil que quede, 25 % al azar).
+- Pesos del reto: Deutsch 70 %, los otros cuatro 7,5 % cada uno.
+- La nota del reto ya no se copia sola: icono „Kopieren“ en la pantalla final y acción „Kopieren“ en la notificación.
+
 ## 13. UI / diseño
 
 - **Tono:** calma, poco contraste agresivo, mucho espacio, sin animaciones bruscas (fades de 200 ms) y háptica suave al responder.

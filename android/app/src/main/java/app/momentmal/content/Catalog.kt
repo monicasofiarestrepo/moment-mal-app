@@ -8,6 +8,8 @@ sealed interface CardDef {
     val deckId: String
     val noteId: String
     val tags: List<String>
+    /** Difficulty 1–3 from the content (null = unknown, treated as 2). */
+    val stufe: Int?
 }
 
 /** direction: "de-es", "es-de", "artikel", "cloze" or a Lesetext frage id ("q1"…). */
@@ -20,6 +22,7 @@ data class DeCard(
 ) : CardDef {
     override val noteId get() = note.id
     override val tags get() = note.tags
+    override val stufe get() = note.stufe
 }
 
 data class BiCard(
@@ -29,6 +32,7 @@ data class BiCard(
 ) : CardDef {
     override val noteId get() = note.id
     override val tags get() = note.tags
+    override val stufe get() = note.stufe
 }
 
 class Catalog(val manifest: Manifest, val cards: List<CardDef>) {

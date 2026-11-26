@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -28,6 +29,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -254,9 +257,26 @@ class ChallengeActivity : ComponentActivity() {
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("DEINE NOTIZ", style = MaterialTheme.typography.labelSmall, color = MM.Sage)
+            var copied by remember { mutableStateOf(false) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("DEINE NOTIZ", style = MaterialTheme.typography.labelSmall, color = MM.Sage, modifier = Modifier.weight(1f))
+                // copy only on purpose, never automatically
+                Row(
+                    Modifier
+                        .clip(CircleShape)
+                        .clickable { copyToClipboard(this@ChallengeActivity, note); copied = true }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
+                        "Kopieren", tint = if (copied) MM.Sage else MM.Muted, modifier = Modifier.size(18.dp),
+                    )
+                    Text(if (copied) " Kopiert" else " Kopieren", style = MaterialTheme.typography.labelMedium, color = if (copied) MM.Sage else MM.Muted)
+                }
+            }
             Text(note, style = CardText.body)
-            Text("Kopiert – auch in deinen Benachrichtigungen.", style = MaterialTheme.typography.bodySmall, color = MM.Muted)
+            Text("Steht auch in deinen Benachrichtigungen.", style = MaterialTheme.typography.bodySmall, color = MM.Muted)
         }
     }
 
@@ -275,7 +295,6 @@ class ChallengeActivity : ComponentActivity() {
     }
 
     private fun deliverNote(note: String) {
-        getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Moment mal", note))
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL_NOTE, "Notizen", NotificationManager.IMPORTANCE_DEFAULT))
         val n = NotificationCompat.Builder(this, CHANNEL_NOTE)
@@ -283,6 +302,7 @@ class ChallengeActivity : ComponentActivity() {
             .setContentTitle("Du wolltest:")
             .setContentText(note)
             .setStyle(NotificationCompat.BigTextStyle().bigText(note))
+            .addAction(0, "Kopieren", NoteCopyReceiver.pending(this, note))
             .setAutoCancel(true)
             .setTimeoutAfter(60 * 60_000L)
             .build()
@@ -308,5 +328,24 @@ class ChallengeActivity : ComponentActivity() {
         const val DEFAULT_REQUIRED = LimitRules.BASE
         private const val CHANNEL_NOTE = "note"
         private const val NOTE_ID = 42
+    }
+}
+
+fun copyToClipboard(context: Context, text: String) {
+    context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Moment mal", text))
+}
+
+/** "Kopieren" action on the note notification. */
+class NoteCopyReceiver : android.content.BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        intent.getStringExtra(EXTRA_TEXT)?.let { copyToClipboard(context, it) }
+    }
+
+    companion object {
+        private const val EXTRA_TEXT = "text"
+        fun pending(context: Context, text: String): android.app.PendingIntent = android.app.PendingIntent.getBroadcast(
+            context, 1, Intent(context, NoteCopyReceiver::class.java).putExtra(EXTRA_TEXT, text),
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+        )
     }
 }
