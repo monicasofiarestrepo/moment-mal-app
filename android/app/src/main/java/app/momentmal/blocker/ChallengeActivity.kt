@@ -63,6 +63,7 @@ import app.momentmal.R
 import app.momentmal.container
 import app.momentmal.session.SessionMode
 import app.momentmal.ui.study.Finished
+import app.momentmal.ui.study.SecondaryButton
 import app.momentmal.ui.study.StudyScreen
 import app.momentmal.ui.study.StudyViewModel
 import app.momentmal.ui.study.studyViewModel
@@ -142,6 +143,9 @@ class ChallengeActivity : ComponentActivity() {
         LaunchedEffect(Unit) { delay(1000); showSkip = true }
 
         val firstQuestion = ui.counted == 0 && !ui.finished
+        LaunchedEffect(ui.finished) {
+            if (ui.finished && targetKey == StrictRules.KEY_CHANGE) container.blockerPrefs.confirmStaged()
+        }
         val label = appLabel
 
         StudyScreen(
@@ -218,6 +222,14 @@ class ChallengeActivity : ComponentActivity() {
                     button = if (targetKey == StrictRules.KEY_CHANGE) "Fertig" else "Weiter zu $label",
                     onDone = { scope.launch { proceed(note) } },
                     extra = { if (note.isNotBlank()) NoteCard(note) },
+                    secondary = {
+                        if (targetKey != StrictRules.KEY_CHANGE) {
+                            SecondaryButton(if (targetKey == StrictRules.KEY_SETTINGS) "Schließen" else "Beide schließen") {
+                                closeBoth(note)
+                            }
+                        }
+                        SecondaryButton("${EXTRA_CARDS} weitere Karten") { vm.extend(EXTRA_CARDS) }
+                    },
                 )
             },
         )
@@ -282,6 +294,17 @@ class ChallengeActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * "Beide schließen": leave both to the home screen without any free time, so opening the
+     * blocked app/site again means a new challenge. (Android doesn't let one app close another.)
+     */
+    private fun closeBoth(note: String) {
+        if (note.isNotBlank()) deliverNote(note)
+        leaving = true
+        startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        finishAndRemoveTask()
+    }
+
     /** Grants the grace period and reveals the blocked app where it was. */
     private suspend fun proceed(note: String) {
         when (targetKey) {
@@ -328,6 +351,7 @@ class ChallengeActivity : ComponentActivity() {
         const val EXTRA_REQUIRED = "required"
         const val EXTRA_OVER_MS = "over_ms"
         const val EXTRA_IMMEDIATE = "immediate"
+        const val EXTRA_CARDS = 5
         const val DEFAULT_REQUIRED = LimitRules.BASE
         private const val CHANNEL_NOTE = "note"
         private const val NOTE_ID = 42

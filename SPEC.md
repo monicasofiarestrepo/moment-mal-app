@@ -337,6 +337,14 @@ Ejemplos:
 - Se cambia en Einstellungen → Apps & Websites (chip „15 Min.“ junto a cada app/sitio bloqueado), en pasos de 5 min, entre 5 y 45.
 - **Bajar:** inmediato y gratis. **Subir:** 30 preguntas para esa app (siempre, también sin modo estricto) y aplica en cuanto se terminan. Máximo 45 min.
 
+## 12d. Botones al final del reto
+
+Al terminar las tarjetas de un reto siempre aparecen:
+- **„Weiter zu …“**: abre la app/URL con su tiempo libre.
+- **„Beide schließen“**: vuelve a la pantalla de inicio sin tiempo libre (la próxima apertura vuelve a pedir el reto). Android no permite que una app cierre a otra, así que la app bloqueada queda minimizada. En la protección de ajustes se llama „Schließen“; no aparece en confirmaciones internas.
+- **„5 weitere Karten“**: 5 tarjetas más (contador 21 / 25…) y luego otra vez estos botones.
+Una confirmación (`protect:change`) se guarda en cuanto se terminan las preguntas, aunque después se repasen más tarjetas.
+
 ## 13. UI / diseño
 
 - **Tono:** calma, poco contraste agresivo, mucho espacio, sin animaciones bruscas (fades de 200 ms) y háptica suave al responder.

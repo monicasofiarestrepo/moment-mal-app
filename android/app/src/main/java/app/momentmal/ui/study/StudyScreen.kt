@@ -311,8 +311,12 @@ private fun TrafficLight(intervals: Map<Rating, Long>, onRate: (Rating) -> Unit)
 fun Finished(
     title: String, text: String, modifier: Modifier, button: String, onDone: () -> Unit,
     extra: @Composable () -> Unit = {},
+    secondary: @Composable () -> Unit = {},
 ) {
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(vertical = 16.dp),
+        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Text(title, style = MaterialTheme.typography.headlineSmall, color = MM.Text)
         Spacer(Modifier.height(8.dp))
         Text(text, style = MaterialTheme.typography.bodyLarge, color = MM.Muted)
@@ -320,5 +324,23 @@ fun Finished(
         extra()
         Spacer(Modifier.height(24.dp))
         PrimaryButton(button, onDone)
+        Spacer(Modifier.height(10.dp))
+        secondary()
+    }
+}
+
+@Composable
+fun SecondaryButton(text: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .height(52.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, MM.Border, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleMedium, color = MM.Muted)
     }
 }

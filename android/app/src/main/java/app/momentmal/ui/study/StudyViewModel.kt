@@ -76,6 +76,13 @@ class StudyViewModel(app: Application, private val mode: SessionMode, private va
         _ui.update { it.copy(chosen = index, revealed = true) }
     }
 
+    /** Challenge finished: review [by] more cards, then the end screen shows again. */
+    fun extend(by: Int = 5) {
+        engine.extend(by)
+        _ui.update { it.copy(required = engine.required, finished = false) }
+        advance()
+    }
+
     /** After an MCQ answer was shown. */
     fun next() = advance()
 

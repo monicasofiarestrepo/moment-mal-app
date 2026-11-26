@@ -74,7 +74,12 @@ class SessionEngine(
     var counted = 0
         private set
 
-    val required: Int? get() = (mode as? SessionMode.Challenge)?.required
+    private var extra = 0
+
+    val required: Int? get() = (mode as? SessionMode.Challenge)?.required?.plus(extra)
+
+    /** "5 weitere Karten": keep going after the challenge was completed. */
+    fun extend(by: Int) { if (mode is SessionMode.Challenge) extra += by }
     val isComplete: Boolean get() = required?.let { counted >= it } ?: false
 
     fun stateOf(cardId: String): CardStateEntity? = states[cardId]

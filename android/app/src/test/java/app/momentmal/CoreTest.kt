@@ -116,6 +116,18 @@ class CoreTest {
         assertTrue(e.isComplete)
     }
 
+    @Test fun challengeCanBeExtendedByFive() {
+        val e = engine(SessionMode.Challenge(10))
+        repeat(10) { e.answer(e.next()!!, Rating.GOOD, 1000, 1) }
+        assertTrue(e.next() == null && e.isComplete)
+        e.extend(5)
+        assertEquals(15, e.required)
+        var more = 0
+        while (true) { val i = e.next() ?: break; e.answer(i, Rating.GOOD, 1000, 1); more++ }
+        assertEquals(5, more)
+        assertTrue(e.isComplete)
+    }
+
     @Test fun directStudyStillRepeatsAgainCards() {
         val e = engine(SessionMode.Direct("deutsch"))
         val first = e.next()!!
