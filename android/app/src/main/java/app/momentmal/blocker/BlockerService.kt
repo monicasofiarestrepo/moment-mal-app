@@ -168,7 +168,7 @@ class BlockerService : AccessibilityService() {
         val now = System.currentTimeMillis()
         val protect = StrictRules.isProtectKey(key)
         // pause days switch off the quiz for distractions, never the self-protection
-        if ((snap.pausedToday && !protect) || snap.inGrace(key, now)) return
+        if ((snap.pausedToday && !protect) || snap.inGrace(key, now) || GraceMemory.inGrace(key, now)) return
         if (key == lastLaunchKey && now - lastLaunchAt < 1500) return
         lastLaunchKey = key
         lastLaunchAt = now

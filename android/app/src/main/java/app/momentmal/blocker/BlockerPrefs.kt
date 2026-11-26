@@ -170,6 +170,7 @@ class BlockerPrefs(private val context: Context) {
     }
 
     suspend fun grantGrace(key: String, minutes: Int = GRACE_MINUTES) {
+        GraceMemory.grant(key, System.currentTimeMillis() + minutes * 60_000L)
         store.edit { it[longPreferencesKey(GRACE_PREFIX + key)] = System.currentTimeMillis() + minutes * 60_000L }
     }
 
@@ -262,4 +263,14 @@ class BlockerPrefs(private val context: Context) {
             "youtube.com", "x.com", "twitter.com", "reddit.com",
         )
     }
+}
+
+/**
+ * Grace granted in this process, visible to the accessibility service immediately
+ * (the DataStore snapshot reaches it a moment later — returning to the app must not race it).
+ */
+object GraceMemory {
+    private val until = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    fun grant(key: String, untilMs: Long) { until[key] = untilMs }
+    fun inGrace(key: String, now: Long) = (until[key] ?: 0) > now
 }

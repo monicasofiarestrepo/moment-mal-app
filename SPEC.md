@@ -130,7 +130,7 @@ Dentro del tema sorteado, por orden de prioridad:
 4. **Fallback:** si no hay nada de lo anterior, tarjetas aleatorias del tema, con preferencia por las de menor estabilidad.
 
 - Un fallo cuenta igual como una de las N preguntas.
-- Una tarjeta marcada 🔴 vuelve a aparecer al final de la misma sesión, como en Anki. Esta reaparición **no** cuenta para N.
+- Una tarjeta marcada 🔴 vuelve a aparecer en la misma sesión **solo en estudio directo** (como en Anki). En un reto no hay repeticiones: tras exactamente N respuestas se abre la app; FSRS la reprograma (1 min) y aparece en la siguiente sesión.
 - No se repite la misma tarjeta (ni su dirección inversa) dentro de una sesión, salvo por 🔴.
 
 ---

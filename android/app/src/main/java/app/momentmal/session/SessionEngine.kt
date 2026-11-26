@@ -75,14 +75,16 @@ class SessionEngine(
         private set
 
     val required: Int? get() = (mode as? SessionMode.Challenge)?.required
-    val isComplete: Boolean get() = required?.let { counted >= it && repeatQueue.isEmpty() } ?: false
+    val isComplete: Boolean get() = required?.let { counted >= it } ?: false
 
     fun stateOf(cardId: String): CardStateEntity? = states[cardId]
 
     fun next(): SessionItem? {
         val req = required
         val item = when {
-            req != null && counted >= req -> repeatQueue.removeFirstOrNull()?.let { make(it.first, mcq = false, repeat = true) }
+            // Challenge: exactly the required number of answers, then the way is free.
+            req != null && counted >= req -> null
+            req != null -> pickFresh()
             else -> {
                 val ready = if (req == null) repeatQueue.firstOrNull { it.second <= served } else null
                 if (ready != null) {
@@ -105,7 +107,9 @@ class SessionEngine(
         val entity = CardStateEntity.from(item.card.id, item.card.deckId, srs, lang, prev?.firstSeen ?: now)
         states[item.card.id] = entity
         if (!item.isRepeat) counted++
-        if (rating == Rating.AGAIN) {
+        // "Again" cards come back later in *direct* study; in a challenge FSRS re-schedules
+        // them (due in 1 min) so they show up in the next session instead of prolonging this one.
+        if (rating == Rating.AGAIN && mode is SessionMode.Direct) {
             val n = repeatCounts.getOrDefault(item.card.id, 0)
             if (n < config.maxRepeats) {
                 repeatCounts[item.card.id] = n + 1

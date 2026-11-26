@@ -102,6 +102,28 @@ class CoreTest {
         assertTrue(e.isComplete)
     }
 
+    @Test fun challengeEndsAfterRequiredEvenWithAllAgain() {
+        val e = engine(SessionMode.Challenge(10))
+        var served = 0
+        while (true) {
+            val item = e.next() ?: break
+            assertTrue("no repeats inside a challenge", !item.isRepeat)
+            e.answer(item, Rating.AGAIN, 1000, 1)
+            served++
+            assertTrue("never more than required", served <= 10)
+        }
+        assertEquals(10, served)
+        assertTrue(e.isComplete)
+    }
+
+    @Test fun directStudyStillRepeatsAgainCards() {
+        val e = engine(SessionMode.Direct("deutsch"))
+        val first = e.next()!!
+        e.answer(first, Rating.AGAIN, 1000, 1)
+        val later = (1..8).mapNotNull { e.next()?.also { i -> e.answer(i, Rating.GOOD, 1000, 1) } }
+        assertTrue("again card returns in direct mode", later.any { it.isRepeat && it.card.id == first.card.id })
+    }
+
     @Test fun topicWeightsApproximately70Percent() {
         var de = 0; var total = 0
         repeat(200) { seed ->
