@@ -128,6 +128,19 @@ class CoreTest {
         assertTrue(e.isComplete)
     }
 
+    @Test fun afterDailyCapNewCardsBeatRepeats() {
+        val now = 2_000_000_000_000L
+        // one known card, reviewed 5 min ago and not due; daily new quota already used up
+        val known = catalog.byDeck["deutsch"]!!.first()
+        val st = mapOf(known.id to CardStateEntity(known.id, "deutsch", Phase.REVIEW.ordinal, 3.0, 5.0, now + day, now - 5 * Fsrs.MIN, 2, 0, 0, 2, null, 0))
+        val e = SessionEngine(catalog, presenter, fsrs, st, SessionMode.Challenge(10), newIntroducedToday = 40, rnd = Random(3), clock = { now })
+        repeat(10) {
+            val i = e.next()!!
+            assertTrue("no filler repeat of a just-seen card", i.card.noteId != known.noteId || i.kind == ItemKind.MCQ)
+            e.answer(i, Rating.GOOD, 1000, 1)
+        }
+    }
+
     @Test fun directStudyStillRepeatsAgainCards() {
         val e = engine(SessionMode.Direct("deutsch"))
         val first = e.next()!!

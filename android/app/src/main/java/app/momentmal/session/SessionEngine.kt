@@ -24,7 +24,7 @@ sealed interface SessionMode {
 }
 
 data class SessionConfig(
-    val newCardsPerDay: Int = 20,
+    val newCardsPerDay: Int = 40,
     /** Share of items served as multiple choice when GEFESTIGT+ cards exist. */
     val mcqShare: Double = 0.3,
     /** Max times an "Again" card comes back within one session. */
@@ -168,9 +168,13 @@ class SessionEngine(
         if (newToday < config.newCardsPerDay && fresh.isNotEmpty()) {
             return make(pickNew(fresh), mcq = false, repeat = false)
         }
-        // 4) fallback: weakest known cards, otherwise anything
-        val known = cands.filter { (st(it)?.reps ?: 0) > 0 }.sortedBy { st(it)!!.stability }.take(10)
-        val pick = if (known.isNotEmpty()) known.random(rnd) else cands.random(rnd)
+        // 4) daily cap reached: still prefer something new over repeating known cards
+        if (fresh.isNotEmpty()) return make(pickNew(fresh), mcq = false, repeat = false)
+        // 5) everything seen: weakest cards, but not ones from the last hour
+        val known = cands.filter { (st(it)?.reps ?: 0) > 0 }
+        val rested = known.filter { now - (st(it)!!.lastReview ?: 0) > REST_MS }
+        val pool = (rested.ifEmpty { known }).sortedBy { st(it)!!.stability }.take(10)
+        val pick = if (pool.isNotEmpty()) pool.random(rnd) else cands.random(rnd)
         return make(pick, mcq = false, repeat = false)
     }
 
@@ -204,5 +208,10 @@ class SessionEngine(
             isNew = isNew,
             intervals = fsrs.preview(state?.toSrs() ?: SrsState(), clock()),
         )
+    }
+
+    private companion object {
+        /** Known cards seen within this time aren't used as filler. */
+        const val REST_MS = 60 * 60_000L
     }
 }

@@ -125,9 +125,9 @@ Si abres la app desde el launcher, eliges tema (o „Gemischt“) y estudias sin
 ### Composición de la sesión
 Dentro del tema sorteado, por orden de prioridad:
 1. **Repasos vencidos** (`due <= ahora`), el más atrasado primero → flashcard con semáforo.
-2. **Tarjetas nuevas** (máx. 20 nuevas al día en total, configurable) → flashcard.
+2. **Tarjetas nuevas** (40 al día; al agotarse siguen saliendo nuevas antes que repetir) → flashcard.
 3. **Opción múltiple** sobre tarjetas *gefestigt* o superior: ~30% de la sesión cuando existen.
-4. **Fallback:** si no hay nada de lo anterior, tarjetas aleatorias del tema, con preferencia por las de menor estabilidad.
+4. **Fallback:** solo si ya no quedan nuevas: las de menor estabilidad que no se hayan visto en la última hora.
 
 - Un fallo cuenta igual como una de las N preguntas.
 - Una tarjeta marcada 🔴 vuelve a aparecer en la misma sesión **solo en estudio directo** (como en Anki). En un reto no hay repeticiones: tras exactamente N respuestas se abre la app; FSRS la reprograma (1 min) y aparece en la siguiente sesión.
