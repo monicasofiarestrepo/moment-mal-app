@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A calm sage ring with a pause mark: "Moment mal". 108dp canvas, 72dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#8FB3A3"
+        android:strokeWidth="3.5"
+        android:pathData="M54,30a24,24 0 1,1 0,48a24,24 0 1,1 0,-48z" />
+    <path
+        android:fillColor="#E7E3DA"
+        android:pathData="M46.5,44h4.5a1,1 0 0,1 1,1v18a1,1 0 0,1 -1,1h-4.5a1,1 0 0,1 -1,-1v-18a1,1 0 0,1 1,-1z" />
+    <path
+        android:fillColor="#E7E3DA"
+        android:pathData="M57,44h4.5a1,1 0 0,1 1,1v18a1,1 0 0,1 -1,1h-4.5a1,1 0 0,1 -1,-1v-18a1,1 0 0,1 1,-1z" />
+</vector>

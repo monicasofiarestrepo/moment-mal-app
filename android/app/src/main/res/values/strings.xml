@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Moment mal</string>
+    <string name="a11y_description">Erkennt, wenn du eine blockierte App oder Website öffnest, und zeigt vorher ein kurzes Quiz. In Browsern wird nur die Adresszeile gelesen. Es wird nichts gesendet.</string>
+</resources>
