@@ -1,6 +1,7 @@
 package app.momentmal
 
 import app.momentmal.blocker.BlockerSnapshot
+import app.momentmal.blocker.FreeTime
 import app.momentmal.blocker.PendingChanges
 import app.momentmal.blocker.StagedChange
 import app.momentmal.blocker.StrictRules
@@ -30,7 +31,8 @@ class StrictTest {
     }
 
     @Test fun stagedChangesRoundTrip() {
-        listOf(StagedChange.Unblock("com.instagram.android"), StagedChange.Undomain("x.com"), StagedChange.Limits(40, 120), StagedChange.StrictOff)
+        listOf(StagedChange.Unblock("com.instagram.android"), StagedChange.Undomain("x.com"), StagedChange.Limits(40, 120), StagedChange.StrictOff,
+            StagedChange.FreeTimeUp("web:youtube.com", 45), StagedChange.FreeTimeUp("com.zhiliaoapp.musically", 30))
             .forEach { assertEquals(it, StagedChange.decode(it.encode())) }
     }
 
@@ -52,5 +54,15 @@ class StrictTest {
         assertFalse(StrictRules.isDangerousScreen(listOf("Instagram", "Uninstall", "Force stop"), "Moment mal", desc))
         // settings home / app list with our name but nothing dangerous
         assertFalse(StrictRules.isDangerousScreen(listOf("Apps", "Moment mal", "Instagram", "WhatsApp"), "Moment mal", desc))
+    }
+
+    @Test fun freeTimeDefaultsAndOverrides() {
+        assertEquals(45, FreeTime.default("com.google.android.youtube"))
+        assertEquals(45, FreeTime.default("web:youtube.com"))
+        assertEquals(15, FreeTime.default("com.zhiliaoapp.musically"))
+        assertEquals(15, FreeTime.default("web:x.com"))
+        val s = base.copy(freeMinutes = mapOf("com.instagram.android" to 30))
+        assertEquals(30, s.freeMinutesFor("com.instagram.android"))
+        assertEquals(15, s.freeMinutesFor("com.twitter.android"))
     }
 }

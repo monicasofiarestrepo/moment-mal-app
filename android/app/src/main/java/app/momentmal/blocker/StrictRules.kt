@@ -21,12 +21,15 @@ sealed interface StagedChange {
     data class Undomain(val domain: String) : StagedChange
     data class Limits(val appMin: Int, val totalMin: Int) : StagedChange
     data object StrictOff : StagedChange
+    /** More free minutes after the challenge for one app/site (applies immediately once confirmed). */
+    data class FreeTimeUp(val key: String, val minutes: Int) : StagedChange
 
     fun encode(): String = when (this) {
         is Unblock -> "unblock|$pkg"
         is Undomain -> "undomain|$domain"
         is Limits -> "limits|$appMin|$totalMin"
         StrictOff -> "strictoff"
+        is FreeTimeUp -> "freetime|$key|$minutes"
     }
 
     companion object {
@@ -37,10 +40,25 @@ sealed interface StagedChange {
                 "undomain" -> Undomain(p[1])
                 "limits" -> Limits(p[1].toInt(), p[2].toInt())
                 "strictoff" -> StrictOff
+                "freetime" -> FreeTimeUp(p[1], p[2].toInt())
                 else -> null
             }
         }
     }
+}
+
+/** Free minutes after a completed challenge. */
+object FreeTime {
+    const val SHORT = 15
+    const val LONG = 45
+    const val MIN = 5
+    const val MAX = 45
+    const val STEP = 5
+
+    /** YouTube (app and website) gets long-form time; short-form feeds get 15 minutes. */
+    private val LONG_FORM = setOf("com.google.android.youtube", "web:youtube.com")
+
+    fun default(key: String) = if (key in LONG_FORM) LONG else SHORT
 }
 
 object StrictRules {

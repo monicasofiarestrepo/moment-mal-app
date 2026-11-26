@@ -83,6 +83,7 @@ class ChallengeActivity : ComponentActivity() {
     private var targetKey by mutableStateOf("")
     private var required = DEFAULT_REQUIRED
     private var overMs = 0L
+    private var immediate = false
     private var leaving = false
 
     private fun readExtras(i: Intent) {
@@ -95,6 +96,7 @@ class ChallengeActivity : ComponentActivity() {
         readExtras(intent)
         required = intent.getIntExtra(EXTRA_REQUIRED, DEFAULT_REQUIRED)
         overMs = intent.getLongExtra(EXTRA_OVER_MS, 0)
+        immediate = intent.getBooleanExtra(EXTRA_IMMEDIATE, false)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -208,9 +210,9 @@ class ChallengeActivity : ComponentActivity() {
                 Finished(
                     title = if (targetKey == StrictRules.KEY_CHANGE) "Bestätigt." else "Geschafft.",
                     text = when (targetKey) {
-                        StrictRules.KEY_CHANGE -> "Die Änderung gilt ab morgen."
+                        StrictRules.KEY_CHANGE -> if (immediate) "Die Änderung gilt ab sofort." else "Die Änderung gilt ab morgen."
                         StrictRules.KEY_SETTINGS -> "${StrictRules.SETTINGS_GRACE_MIN} Minuten für die Einstellungen."
-                        else -> "${BlockerPrefs.GRACE_MINUTES} Minuten gehören dir."
+                        else -> "${snap?.freeMinutesFor(targetKey) ?: FreeTime.default(targetKey)} Minuten gehören dir."
                     },
                     modifier = m,
                     button = if (targetKey == StrictRules.KEY_CHANGE) "Fertig" else "Weiter zu $label",
@@ -285,7 +287,7 @@ class ChallengeActivity : ComponentActivity() {
         when (targetKey) {
             StrictRules.KEY_CHANGE -> container.blockerPrefs.confirmStaged()
             StrictRules.KEY_SETTINGS -> container.blockerPrefs.grantGrace(targetKey, StrictRules.SETTINGS_GRACE_MIN)
-            else -> container.blockerPrefs.grantGrace(targetKey)
+            else -> container.blockerPrefs.grantGrace(targetKey, container.blockerPrefs.current().freeMinutesFor(targetKey))
         }
         if (note.isNotBlank()) deliverNote(note)
         leaving = true
@@ -325,6 +327,7 @@ class ChallengeActivity : ComponentActivity() {
         const val EXTRA_KEY = "key"
         const val EXTRA_REQUIRED = "required"
         const val EXTRA_OVER_MS = "over_ms"
+        const val EXTRA_IMMEDIATE = "immediate"
         const val DEFAULT_REQUIRED = LimitRules.BASE
         private const val CHANNEL_NOTE = "note"
         private const val NOTE_ID = 42

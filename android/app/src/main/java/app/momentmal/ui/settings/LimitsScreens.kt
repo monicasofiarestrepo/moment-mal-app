@@ -82,7 +82,7 @@ fun LimitsScreen(onBack: () -> Unit) {
         ) {
             Text(
                 "Über dem Limit kostet jede App ${LimitRules.OVER_LIMIT} Fragen statt ${LimitRules.BASE}, " +
-                    "plus ${LimitRules.PER_EXTRA_BLOCK} für jede weiteren 2 Stunden. Nach den ${BlockerPrefs.GRACE_MINUTES} freien Minuten " +
+                    "plus ${LimitRules.PER_EXTRA_BLOCK} für jede weiteren 2 Stunden. Nach der freien Zeit (je App) " +
                     "kommt das Quiz dann auch mitten in der App.",
                 style = MaterialTheme.typography.bodyMedium, color = MM.Muted,
             )
@@ -210,7 +210,7 @@ fun PauseScreen(onBack: () -> Unit) {
 // ------------------------------------------------------------------ websites (used inside AppsScreen)
 
 @Composable
-fun WebsitesSection() {
+fun WebsitesSection(onEditFreeTime: (key: String, label: String) -> Unit = { _, _ -> }) {
     val ctx = LocalContext.current
     val prefs = ctx.container.blockerPrefs
     val snap by prefs.snapshot.collectAsState(initial = null)
@@ -227,6 +227,7 @@ fun WebsitesSection() {
                 Spacer(Modifier.width(14.dp))
                 Text(d, style = MaterialTheme.typography.bodyLarge, color = MM.Text, modifier = Modifier.weight(1f))
                 val pendingFree = d in snap?.pending?.undomain.orEmpty()
+                if (!pendingFree) snap?.let { s -> FreeTimeChip(s.freeMinutesFor(WebRules.WEB_PREFIX + d)) { onEditFreeTime(WebRules.WEB_PREFIX + d, d) } }
                 if (pendingFree) Text("ab morgen frei ", style = MaterialTheme.typography.bodySmall, color = MM.Yellow)
                 else IconButton(onClick = {
                     scope.launch {

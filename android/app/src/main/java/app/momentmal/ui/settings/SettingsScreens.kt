@@ -67,6 +67,9 @@ import app.momentmal.blocker.BlockerPrefs
 import app.momentmal.blocker.BlockerService
 import app.momentmal.blocker.LimitRules
 import app.momentmal.blocker.StagedChange
+import app.momentmal.blocker.FreeTime
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Remove
 import app.momentmal.blocker.Strict
 import app.momentmal.blocker.StrictRules
 import app.momentmal.container
@@ -172,7 +175,7 @@ fun SettingsScreen(onBack: () -> Unit, onApps: () -> Unit, onLimits: () -> Unit,
             Section("BLOCKIEREN")
             NavRow(
                 "Apps & Websites",
-                "${snap?.blocked?.count { isInstalled(ctx, it) } ?: "–"} Apps · ${snap?.domains?.size ?: "–"} Websites · ${BlockerPrefs.GRACE_MINUTES} Min. frei nach dem Quiz",
+                "${snap?.blocked?.count { isInstalled(ctx, it) } ?: "–"} Apps · ${snap?.domains?.size ?: "–"} Websites · ${FreeTime.MIN}–${FreeTime.MAX} Min. frei je App",
                 onApps,
             )
             NavRow(
@@ -245,6 +248,79 @@ private fun pendingSummary(ctx: Context, p: app.momentmal.blocker.PendingChanges
     if (p.strictOff) add("strenger Modus aus")
 }.joinToString(" · ")
 
+/** "15 Min." chip: free time after the quiz for this app/site. */
+@Composable
+fun FreeTimeChip(minutes: Int, onClick: () -> Unit) {
+    Text(
+        "$minutes Min.",
+        style = MaterialTheme.typography.labelMedium, color = MM.Sage,
+        modifier = Modifier
+            .padding(end = 8.dp)
+            .clip(CircleShape)
+            .background(MM.Sage.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    )
+}
+
+/**
+ * Free time after the quiz for one app/site. Less: immediate, free.
+ * More (max 45): costs 30 questions, then applies immediately.
+ */
+@Composable
+fun FreeTimeDialog(key: String, label: String, current: Int, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var value by remember(key) { mutableStateOf(current) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MM.Surface,
+        title = { Text(label, style = MaterialTheme.typography.titleLarge, color = MM.Text) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Freie Zeit nach dem Quiz", style = MaterialTheme.typography.bodyMedium, color = MM.Muted)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { value = (value - FreeTime.STEP).coerceAtLeast(FreeTime.MIN) }) {
+                        Icon(Icons.Rounded.Remove, "weniger", tint = MM.Muted)
+                    }
+                    Text("$value Min.", style = MaterialTheme.typography.headlineSmall, color = MM.Sage,
+                        modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    IconButton(onClick = { value = (value + FreeTime.STEP).coerceAtMost(FreeTime.MAX) }) {
+                        Icon(Icons.Rounded.Add, "mehr", tint = MM.Muted)
+                    }
+                }
+                Text(
+                    when {
+                        value > current -> "Mehr Zeit kostet ${StrictRules.CONFIRM_QUESTIONS} Fragen und gilt danach sofort. Maximum ${FreeTime.MAX} Min."
+                        value < current -> "Weniger Zeit gilt sofort, ohne Fragen."
+                        else -> "Mehr Zeit kostet ${StrictRules.CONFIRM_QUESTIONS} Fragen (max. ${FreeTime.MAX} Min.), weniger ist gratis."
+                    },
+                    style = MaterialTheme.typography.bodySmall, color = if (value > current) MM.Yellow else MM.Muted,
+                )
+            }
+        },
+        confirmButton = {
+            Text(
+                if (value > current) "${StrictRules.CONFIRM_QUESTIONS} Fragen beantworten" else "Speichern",
+                style = MaterialTheme.typography.labelLarge, color = MM.Sage,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable {
+                    scope.launch {
+                        when {
+                            value > current -> Strict.requestRelax(ctx, StagedChange.FreeTimeUp(key, value))
+                            value < current -> ctx.container.blockerPrefs.setFreeMinutes(key, value)
+                        }
+                        onDismiss()
+                    }
+                }.padding(10.dp),
+            )
+        },
+        dismissButton = {
+            Text("Abbrechen", style = MaterialTheme.typography.labelLarge, color = MM.Muted,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onDismiss).padding(10.dp))
+        },
+    )
+}
+
 private fun isInstalled(ctx: Context, pkg: String) =
     runCatching { ctx.packageManager.getApplicationInfo(pkg, 0); true }.getOrDefault(false)
 
@@ -316,6 +392,10 @@ fun AppsScreen(onBack: () -> Unit) {
     val snap by prefs.snapshot.collectAsState(initial = null)
     var apps by remember { mutableStateOf<List<AppEntry>?>(null) }
     val scope = rememberCoroutineScope()
+    var editing by remember { mutableStateOf<Pair<String, String>?>(null) } // key, label
+    editing?.let { (key, label) ->
+        snap?.let { FreeTimeDialog(key, label, it.freeMinutesFor(key), onDismiss = { editing = null }) }
+    }
 
     LaunchedEffect(Unit) {
         apps = withContext(Dispatchers.IO) {
@@ -341,7 +421,7 @@ fun AppsScreen(onBack: () -> Unit) {
                     "Beim Öffnen kommt zuerst das Quiz.",
                     style = MaterialTheme.typography.bodyMedium, color = MM.Muted, modifier = Modifier.padding(bottom = 12.dp),
                 )
-                WebsitesSection()
+                WebsitesSection(onEditFreeTime = { key, label -> editing = key to label })
             }
             items(sorted, key = { it.pkg }) { app ->
                 val pendingFree = app.pkg in snap?.pending?.unblock.orEmpty()
@@ -366,6 +446,7 @@ fun AppsScreen(onBack: () -> Unit) {
                         Text(app.label, style = MaterialTheme.typography.bodyLarge, color = MM.Text)
                         if (pendingFree) Text("ab morgen frei", style = MaterialTheme.typography.bodySmall, color = MM.Yellow)
                     }
+                    if (on) snap?.let { FreeTimeChip(it.freeMinutesFor(app.pkg)) { editing = app.pkg to app.label } }
                     Switch(
                         checked = on,
                         onCheckedChange = toggle,

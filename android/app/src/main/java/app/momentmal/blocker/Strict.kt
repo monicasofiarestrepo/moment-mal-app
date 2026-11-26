@@ -40,8 +40,8 @@ object Strict {
     }
 
     /**
-     * A relaxing change in strict mode: remember it, then ask for 30 questions.
-     * On completion it becomes pending and applies from tomorrow.
+     * A relaxing change: remember it, then ask for 30 questions. On completion it becomes
+     * pending (from tomorrow) — except more free time, which applies immediately.
      */
     suspend fun requestRelax(context: Context, change: StagedChange) {
         context.container.blockerPrefs.stage(change)
@@ -50,6 +50,7 @@ object Strict {
                 .putExtra(ChallengeActivity.EXTRA_PKG, context.packageName)
                 .putExtra(ChallengeActivity.EXTRA_KEY, StrictRules.KEY_CHANGE)
                 .putExtra(ChallengeActivity.EXTRA_REQUIRED, StrictRules.CONFIRM_QUESTIONS)
+                .putExtra(ChallengeActivity.EXTRA_IMMEDIATE, change is StagedChange.FreeTimeUp)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }

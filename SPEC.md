@@ -331,6 +331,12 @@ Ejemplos:
 - Pesos del reto: Deutsch 70 %, los otros cuatro 7,5 % cada uno.
 - La nota del reto ya no se copia sola: icono „Kopieren“ en la pantalla final y acción „Kopieren“ en la notificación.
 
+## 12c. Tiempo libre por app
+
+- Tras completar el reto (o saltarlo), cada app/sitio queda libre un tiempo propio: **YouTube 45 min** (app y youtube.com), todo lo demás **15 min** (TikTok, Instagram, X, …). Reemplaza la gracia fija de 20 min.
+- Se cambia en Einstellungen → Apps & Websites (chip „15 Min.“ junto a cada app/sitio bloqueado), en pasos de 5 min, entre 5 y 45.
+- **Bajar:** inmediato y gratis. **Subir:** 30 preguntas para esa app (siempre, también sin modo estricto) y aplica en cuanto se terminan. Máximo 45 min.
+
 ## 13. UI / diseño
 
 - **Tono:** calma, poco contraste agresivo, mucho espacio, sin animaciones bruscas (fades de 200 ms) y háptica suave al responder.

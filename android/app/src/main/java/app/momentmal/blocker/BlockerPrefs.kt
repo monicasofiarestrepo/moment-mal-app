@@ -37,7 +37,10 @@ data class BlockerSnapshot(
     val pending: PendingChanges = PendingChanges(),
     /** Days on which the watchdog found the accessibility service switched off. */
     val protectionOffDays: Set<String> = emptySet(),
+    /** Free minutes after a completed challenge, per key (package or "web:<domain>"); missing = default. */
+    val freeMinutes: Map<String, Int> = emptyMap(),
 ) {
+    fun freeMinutesFor(key: String) = freeMinutes[key] ?: FreeTime.default(key)
     fun inGrace(key: String, now: Long) = (graceUntil[key] ?: 0) > now
     val appLimitMs get() = appLimitMin * 60_000L
     val totalLimitMs get() = totalLimitMin * 60_000L
@@ -69,6 +72,9 @@ class BlockerPrefs(private val context: Context) {
             strict = this[STRICT] ?: true,
             pending = pendingOf(this),
             protectionOffDays = this[PROTECTION_OFF_DAYS] ?: emptySet(),
+            freeMinutes = asMap().entries
+                .filter { it.key.name.startsWith(FREE_PREFIX) }
+                .associate { it.key.name.removePrefix(FREE_PREFIX) to (it.value as Int) },
         )
         return StrictRules.effective(base, LocalDate.now())
     }
@@ -92,11 +98,24 @@ class BlockerPrefs(private val context: Context) {
     /** Remembers a relaxing change; it becomes pending only after the 30-question challenge. */
     suspend fun stage(change: StagedChange) = store.edit { it[STAGED] = change.encode() }
 
-    /** Called when the confirmation challenge is completed: staged → pending (from tomorrow). */
+    /** Lowering the free time is immediate and free. */
+    suspend fun setFreeMinutes(key: String, minutes: Int) = store.edit {
+        it[intPreferencesKey(FREE_PREFIX + key)] = minutes.coerceIn(FreeTime.MIN, FreeTime.MAX)
+    }
+
+    /**
+     * Called when the confirmation challenge is completed. More free time applies right away;
+     * every other relaxation becomes pending (from tomorrow).
+     */
     suspend fun confirmStaged() = store.edit {
         val c = it[STAGED]?.let(StagedChange::decode) ?: return@edit
         it.remove(STAGED)
+        if (c is StagedChange.FreeTimeUp) {
+            it[intPreferencesKey(FREE_PREFIX + c.key)] = c.minutes.coerceIn(FreeTime.MIN, FreeTime.MAX)
+            return@edit
+        }
         when (c) {
+            is StagedChange.FreeTimeUp -> {}
             is StagedChange.Unblock -> it[P_UNBLOCK] = (it[P_UNBLOCK] ?: emptySet()) + c.pkg
             is StagedChange.Undomain -> it[P_UNDOMAIN] = (it[P_UNDOMAIN] ?: emptySet()) + c.domain
             is StagedChange.Limits -> { it[P_APP_LIMIT] = c.appMin; it[P_TOTAL_LIMIT] = c.totalMin }
@@ -206,6 +225,7 @@ class BlockerPrefs(private val context: Context) {
         const val DEFAULT_APP_LIMIT = 30
         const val DEFAULT_TOTAL_LIMIT = 90
         private const val GRACE_PREFIX = "grace_"
+        private const val FREE_PREFIX = "freemin_"
         private val BLOCKED = stringSetPreferencesKey("blocked")
         private val DOMAINS = stringSetPreferencesKey("domains")
         private val SKIP_DAY = stringPreferencesKey("skip_day")
