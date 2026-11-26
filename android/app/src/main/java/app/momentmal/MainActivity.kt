@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // pick up content edits from GitHub (at most every 6 h)
         lifecycleScope.launch { container.sync.syncIfStale() }
+        lifecycleScope.launch { app.momentmal.blocker.Strict.commitDue(this@MainActivity) }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),

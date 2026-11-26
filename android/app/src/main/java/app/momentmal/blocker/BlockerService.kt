@@ -91,9 +91,10 @@ class BlockerService : AccessibilityService() {
         if (pkg in transient) return
 
         val isBrowser = pkg in WebRules.URL_BARS
+        val isGuarded = pkg in StrictRules.GUARDED_PACKAGES
         if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
-            // content changes only matter for reading the address bar, throttled
-            if (!isBrowser || pkg != lastPkg) return
+            // content changes only matter for browsers (address bar) and guarded settings screens, throttled
+            if (!(isBrowser || isGuarded) || pkg != lastPkg) return
             val now = System.currentTimeMillis()
             if (now - lastUrlCheck < URL_THROTTLE_MS) return
             lastUrlCheck = now
@@ -103,10 +104,20 @@ class BlockerService : AccessibilityService() {
 
     private fun handleForeground(pkg: String) {
         if (returnSafetyNet(pkg)) return
-        val key = if (pkg in WebRules.URL_BARS) browserKey(pkg) else pkg
+        val key = when {
+            pkg in WebRules.URL_BARS -> browserKey(pkg)
+            pkg in StrictRules.GUARDED_PACKAGES && snap.strict && isDangerousScreen(pkg) -> StrictRules.KEY_SETTINGS
+            else -> pkg
+        }
         lastPkg = pkg
         if (key == lastKey) return
         lastKey = key
+
+        if (key == StrictRules.KEY_SETTINGS) {
+            tracker.switchTo(null)
+            maybeIntercept(key, pkg)
+            return
+        }
 
         val blocked = isBlocked(key)
         tracker.switchTo(if (blocked) key else null)
@@ -132,17 +143,38 @@ class BlockerService : AccessibilityService() {
         return node.text?.toString()
     }
 
+    /** Reads the visible texts of a settings/installer window (bounded walk). */
+    private fun isDangerousScreen(pkg: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        if (root.packageName?.toString() != pkg) return false
+        val texts = ArrayList<String>()
+        val queue = ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>().apply { add(root) }
+        var visited = 0
+        while (queue.isNotEmpty() && visited++ < 400) {
+            val n = queue.removeFirst()
+            n.text?.let { texts += it.toString() }
+            n.contentDescription?.let { texts += it.toString() }
+            for (i in 0 until n.childCount) n.getChild(i)?.let(queue::addLast)
+        }
+        return StrictRules.isDangerousScreen(texts, appName, A11Y_SNIPPET)
+    }
+
+    private val appName by lazy { getString(app.momentmal.R.string.app_name) }
+
     private fun isBlocked(key: String) =
         key in snap.blocked || (key.startsWith(WebRules.WEB_PREFIX) && key.removePrefix(WebRules.WEB_PREFIX) in snap.domains)
 
     private fun maybeIntercept(key: String, pkg: String) {
         val now = System.currentTimeMillis()
-        if (snap.pausedToday || snap.inGrace(key, now)) return
+        val protect = StrictRules.isProtectKey(key)
+        // pause days switch off the quiz for distractions, never the self-protection
+        if ((snap.pausedToday && !protect) || snap.inGrace(key, now)) return
         if (key == lastLaunchKey && now - lastLaunchAt < 1500) return
         lastLaunchKey = key
         lastLaunchAt = now
 
-        val demand = LimitRules.demand(tracker.usedMs(key, now), tracker.totalMs(now), snap.appLimitMs, snap.totalLimitMs)
+        val demand = if (protect) LimitRules.Demand(StrictRules.CONFIRM_QUESTIONS, 0)
+        else LimitRules.demand(tracker.usedMs(key, now), tracker.totalMs(now), snap.appLimitMs, snap.totalLimitMs)
         startActivity(
             Intent(this, ChallengeActivity::class.java)
                 .putExtra(ChallengeActivity.EXTRA_PKG, pkg)
@@ -156,6 +188,7 @@ class BlockerService : AccessibilityService() {
     /** Every minute: persist time, and interrupt over-limit use once the grace period is over. */
     private fun onTick() {
         tracker.flush()
+        scope.launch { Strict.commitDue(this@BlockerService) }
         val key = lastKey ?: return
         val pkg = lastPkg ?: return
         if (!isBlocked(key)) return
@@ -206,6 +239,8 @@ class BlockerService : AccessibilityService() {
     companion object {
         private const val TICK_MS = 60_000L
         private const val URL_THROTTLE_MS = 500L
+        /** Unique part of our accessibility description (identifies our page in Settings). */
+        const val A11Y_SNIPPET = "zeigt vorher ein kurzes Quiz"
 
         private val TRANSIENT = setOf(
             "com.android.systemui",

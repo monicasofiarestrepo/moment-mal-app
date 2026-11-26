@@ -53,6 +53,9 @@ import androidx.core.graphics.drawable.toBitmap
 import app.momentmal.blocker.BlockerPrefs
 import app.momentmal.blocker.LimitRules
 import app.momentmal.blocker.WebRules
+import app.momentmal.blocker.StagedChange
+import app.momentmal.blocker.Strict
+import app.momentmal.blocker.StrictRules
 import app.momentmal.container
 import app.momentmal.ui.study.PrimaryButton
 import app.momentmal.ui.theme.CardText
@@ -83,8 +86,24 @@ fun LimitsScreen(onBack: () -> Unit) {
                     "kommt das Quiz dann auch mitten in der App.",
                 style = MaterialTheme.typography.bodyMedium, color = MM.Muted,
             )
-            Stepper("Pro App", s.appLimitMin) { scope.launch { prefs.setLimits(it, s.totalLimitMin) } }
-            Stepper("Insgesamt", s.totalLimitMin) { scope.launch { prefs.setLimits(s.appLimitMin, it) } }
+            val change: (Int, Int) -> Unit = { app, total ->
+                scope.launch {
+                    if (s.strict && StrictRules.isRelaxing(s.appLimitMin, s.totalLimitMin, app, total))
+                        Strict.requestRelax(ctx, StagedChange.Limits(app, total))
+                    else prefs.setLimits(app, total)
+                }
+            }
+            Stepper("Pro App", s.appLimitMin) { change(it, s.totalLimitMin) }
+            Stepper("Insgesamt", s.totalLimitMin) { change(s.appLimitMin, it) }
+            if (s.pending.appLimitMin != null || s.pending.totalLimitMin != null) Text(
+                "Ab morgen: ${s.pending.appLimitMin ?: s.appLimitMin} Min. pro App · " +
+                    LimitRules.formatDuration((s.pending.totalLimitMin ?: s.totalLimitMin) * 60_000L) + " insgesamt",
+                style = MaterialTheme.typography.bodySmall, color = MM.Yellow,
+            )
+            if (s.strict) Text(
+                "Strenger Modus: höher stellen kostet ${StrictRules.CONFIRM_QUESTIONS} Fragen und gilt ab morgen. Niedriger gilt sofort.",
+                style = MaterialTheme.typography.bodySmall, color = MM.Muted,
+            )
 
             val total = usage.sumOf { it.ms }
             Text("HEUTE", style = MaterialTheme.typography.labelSmall, color = MM.Muted, modifier = Modifier.padding(top = 12.dp))
@@ -207,7 +226,13 @@ fun WebsitesSection() {
                 Icon(Icons.Rounded.Language, null, tint = MM.Muted, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(14.dp))
                 Text(d, style = MaterialTheme.typography.bodyLarge, color = MM.Text, modifier = Modifier.weight(1f))
-                IconButton(onClick = { scope.launch { prefs.setDomain(d, false) } }) {
+                val pendingFree = d in snap?.pending?.undomain.orEmpty()
+                if (pendingFree) Text("ab morgen frei ", style = MaterialTheme.typography.bodySmall, color = MM.Yellow)
+                else IconButton(onClick = {
+                    scope.launch {
+                        if (snap?.strict == true) Strict.requestRelax(ctx, StagedChange.Undomain(d)) else prefs.setDomain(d, false)
+                    }
+                }) {
                     Icon(Icons.Rounded.Close, "entfernen", tint = MM.Muted, modifier = Modifier.size(18.dp))
                 }
             }

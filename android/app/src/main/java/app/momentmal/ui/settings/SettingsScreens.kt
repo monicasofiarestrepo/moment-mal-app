@@ -66,6 +66,9 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import app.momentmal.blocker.BlockerPrefs
 import app.momentmal.blocker.BlockerService
 import app.momentmal.blocker.LimitRules
+import app.momentmal.blocker.StagedChange
+import app.momentmal.blocker.Strict
+import app.momentmal.blocker.StrictRules
 import app.momentmal.container
 import app.momentmal.ui.theme.MM
 import kotlinx.coroutines.Dispatchers
@@ -110,6 +113,8 @@ fun SettingsScreen(onBack: () -> Unit, onApps: () -> Unit, onLimits: () -> Unit,
     val battery = onResumeValue { ctx.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName) }
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notifAsked = true }
     val snap by ctx.container.blockerPrefs.snapshot.collectAsState(initial = null)
+    val admin = onResumeValue { Strict.isAdminActive(ctx) }
+    val scope = rememberCoroutineScope()
 
     ScreenScaffold("Einstellungen", onBack) {
         Column(
@@ -122,20 +127,26 @@ fun SettingsScreen(onBack: () -> Unit, onApps: () -> Unit, onLimits: () -> Unit,
                 text = "Nur einmal nötig, weil die App nicht aus dem Play Store kommt: App-Info öffnen → ⋮ oben rechts → „Eingeschränkte Einstellungen zulassen“.",
                 action = "App-Info öffnen",
             ) {
-                ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")))
+                scope.launch {
+                    Strict.allowSettingsBriefly(ctx)
+                    ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")))
+                }
             }
             Step(
                 n = 2, done = a11y, title = "Bedienungshilfe aktivieren",
                 text = "Bedienungshilfen → Installierte Apps → Moment mal → Ein. Damit erkennt Moment mal, wenn du Instagram & Co. öffnest.",
                 action = "Bedienungshilfen öffnen",
-            ) { ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            ) { scope.launch { Strict.allowSettingsBriefly(ctx); ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } }
             Step(
                 n = 3, done = notif, title = "Benachrichtigungen erlauben",
                 text = "Für deine Notizen: Was du in der App machen wolltest, erscheint nach dem Quiz als Benachrichtigung.",
                 action = if (notifAsked && !notif) "In den Einstellungen erlauben" else "Erlauben",
             ) {
                 if (Build.VERSION.SDK_INT >= 33 && !notifAsked) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                else ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName))
+                else scope.launch {
+                    Strict.allowSettingsBriefly(ctx)
+                    ctx.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, ctx.packageName))
+                }
             }
             Step(
                 n = 4, done = battery, title = "Akku nicht einschränken",
@@ -144,6 +155,19 @@ fun SettingsScreen(onBack: () -> Unit, onApps: () -> Unit, onLimits: () -> Unit,
             ) {
                 ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}")))
             }
+            if (snap?.strict == true) Step(
+                n = 5, done = admin, title = "Deinstallationsschutz",
+                text = "Moment mal wird Geräteadministrator (ohne Rechte). Deinstallieren geht dann erst, wenn du das ausschaltest – und das kostet 30 Fragen.",
+                action = "Aktivieren",
+            ) { scope.launch { Strict.allowSettingsBriefly(ctx); ctx.startActivity(Strict.requestAdminIntent(ctx)) } }
+
+            Section("STRENGER MODUS")
+            snap?.let { StrictCard(it, onToggle = { on ->
+                scope.launch {
+                    if (on) { ctx.container.blockerPrefs.setStrict(true); if (!admin) { Strict.allowSettingsBriefly(ctx); ctx.startActivity(Strict.requestAdminIntent(ctx)) } }
+                    else Strict.requestRelax(ctx, StagedChange.StrictOff)
+                }
+            }) }
 
             Section("BLOCKIEREN")
             NavRow(
@@ -166,6 +190,14 @@ fun SettingsScreen(onBack: () -> Unit, onApps: () -> Unit, onLimits: () -> Unit,
                 style = MaterialTheme.typography.bodySmall, color = MM.Muted, modifier = Modifier.padding(start = 4.dp),
             )
 
+            snap?.pending?.takeIf { !it.isEmpty }?.let { p ->
+                Text(
+                    "Ab ${p.day?.let { d -> java.time.LocalDate.parse(d).let { if (it == java.time.LocalDate.now().plusDays(1)) "morgen" else it.toString() } }}: " +
+                        pendingSummary(ctx, p),
+                    style = MaterialTheme.typography.bodySmall, color = MM.Yellow, modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+
             Section("DATEN")
             NavRow("Inhalte", "Karten aus GitHub synchronisieren", onContent)
             NavRow("Backup", "Exportieren, importieren, wöchentlich automatisch", onBackup)
@@ -173,6 +205,45 @@ fun SettingsScreen(onBack: () -> Unit, onApps: () -> Unit, onLimits: () -> Unit,
         }
     }
 }
+
+@Composable
+private fun StrictCard(s: app.momentmal.blocker.BlockerSnapshot, onToggle: (Boolean) -> Unit) {
+    val offPending = s.pending.strictOff
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MM.Surface)
+            .border(1.dp, MM.Border, RoundedCornerShape(20.dp)).padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Strenger Modus", style = MaterialTheme.typography.titleMedium, color = MM.Text)
+            Text(
+                when {
+                    !s.strict -> "Aus. Lockerungen gelten sofort."
+                    offPending -> "Wird ab morgen ausgeschaltet."
+                    else -> "Lockerungen (Limit hoch, App frei, Modus aus) kosten ${StrictRules.CONFIRM_QUESTIONS} Fragen und gelten erst ab morgen. Einstellungen von Moment mal in Android sind geschützt."
+                },
+                style = MaterialTheme.typography.bodySmall, color = MM.Muted,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(
+            checked = s.strict && !offPending,
+            onCheckedChange = onToggle,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MM.Bg, checkedTrackColor = MM.Sage,
+                uncheckedThumbColor = MM.Muted, uncheckedTrackColor = MM.SurfaceHigh, uncheckedBorderColor = MM.Border,
+            ),
+        )
+    }
+}
+
+private fun pendingSummary(ctx: Context, p: app.momentmal.blocker.PendingChanges): String = buildList {
+    p.unblock.forEach { add("${labelFor(ctx, it)} frei") }
+    p.undomain.forEach { add("$it frei") }
+    p.appLimitMin?.let { add("$it Min. pro App") }
+    p.totalLimitMin?.let { add("${LimitRules.formatDuration(it * 60_000L)} insgesamt") }
+    if (p.strictOff) add("strenger Modus aus")
+}.joinToString(" · ")
 
 private fun isInstalled(ctx: Context, pkg: String) =
     runCatching { ctx.packageManager.getApplicationInfo(pkg, 0); true }.getOrDefault(false)
@@ -273,21 +344,31 @@ fun AppsScreen(onBack: () -> Unit) {
                 WebsitesSection()
             }
             items(sorted, key = { it.pkg }) { app ->
-                val on = app.pkg in blocked
+                val pendingFree = app.pkg in snap?.pending?.unblock.orEmpty()
+                val on = app.pkg in blocked && !pendingFree
+                val toggle: (Boolean) -> Unit = { want ->
+                    scope.launch {
+                        if (!want && snap?.strict == true) Strict.requestRelax(ctx, StagedChange.Unblock(app.pkg))
+                        else prefs.setBlocked(app.pkg, want)
+                    }
+                }
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .clickable { scope.launch { prefs.setBlocked(app.pkg, !on) } }
+                        .clickable { toggle(!on) }
                         .padding(vertical = 10.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Image(app.icon, null, Modifier.size(36.dp).clip(RoundedCornerShape(9.dp)))
                     Spacer(Modifier.width(14.dp))
-                    Text(app.label, style = MaterialTheme.typography.bodyLarge, color = MM.Text, modifier = Modifier.weight(1f))
+                    Column(Modifier.weight(1f)) {
+                        Text(app.label, style = MaterialTheme.typography.bodyLarge, color = MM.Text)
+                        if (pendingFree) Text("ab morgen frei", style = MaterialTheme.typography.bodySmall, color = MM.Yellow)
+                    }
                     Switch(
                         checked = on,
-                        onCheckedChange = { scope.launch { prefs.setBlocked(app.pkg, it) } },
+                        onCheckedChange = toggle,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = MM.Bg, checkedTrackColor = MM.Sage,
                             uncheckedThumbColor = MM.Muted, uncheckedTrackColor = MM.SurfaceHigh, uncheckedBorderColor = MM.Border,

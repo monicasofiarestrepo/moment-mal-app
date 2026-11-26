@@ -83,6 +83,7 @@ data class StatsUi(
     val challenges7: Int = 0,
     val skipped7: Int = 0,
     val abandoned7: Int = 0,
+    val protectionOff7: Int = 0,
     val decks: List<DeckStats> = emptyList(),
     val forecast: List<Bar> = emptyList(),
 )
@@ -130,7 +131,7 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         val weekAgo = now - 7 * 86_400_000L
-        val challenges = c.db.sessions().since(weekAgo).filter { it.origin != "direct" }
+        val challenges = c.db.sessions().since(weekAgo).filter { it.origin != "direct" && !it.origin.startsWith("protect:") }
 
         val states = c.db.cardStates().all().associateBy { it.cardId }
         val since30 = now - 30 * 86_400_000L
@@ -159,6 +160,7 @@ class StatsViewModel(app: Application) : AndroidViewModel(app) {
             baselineMin = baseline, savedTotalMs = saved, usageTodayMs = usage[today] ?: 0, usage7 = usage7,
             challenges7 = challenges.size, skipped7 = challenges.count { it.skipped },
             abandoned7 = challenges.count { !it.completed && !it.skipped },
+            protectionOff7 = snap.protectionOffDays.map(LocalDate::parse).count { !it.isBefore(today.minusDays(6)) },
             decks = decks, forecast = forecast,
         )
     }
@@ -208,6 +210,10 @@ fun StatsScreen(onBack: () -> Unit, vm: StatsViewModel = viewModel()) {
                 Mini(Modifier.weight(1f), ui.abandoned7, "verzichtet")
                 Mini(Modifier.weight(1f), ui.skipped7, "übersprungen")
             }
+            if (ui.protectionOff7 > 0) Text(
+                "Der Schutz war an ${ui.protectionOff7} ${if (ui.protectionOff7 == 1) "Tag" else "Tagen"} ausgeschaltet.",
+                style = MaterialTheme.typography.bodySmall, color = MM.Yellow,
+            )
 
             Section("THEMEN")
             ui.decks.forEach { DeckRow(it) }

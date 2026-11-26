@@ -117,8 +117,12 @@ class ChallengeActivity : ComponentActivity() {
         if (!isChangingConfigurations && !leaving) finishAndRemoveTask()
     }
 
+    private val protect get() = StrictRules.isProtectKey(targetKey)
+
     private val appLabel: String
-        get() = if (targetKey.startsWith(WebRules.WEB_PREFIX)) targetKey.removePrefix(WebRules.WEB_PREFIX) else runCatching {
+        get() = if (targetKey == StrictRules.KEY_SETTINGS) "die Einstellungen"
+        else if (targetKey == StrictRules.KEY_CHANGE) "die Änderung"
+        else if (targetKey.startsWith(WebRules.WEB_PREFIX)) targetKey.removePrefix(WebRules.WEB_PREFIX) else runCatching {
             packageManager.getApplicationLabel(packageManager.getApplicationInfo(targetPkg, 0)).toString()
         }.getOrDefault("die App")
 
@@ -141,7 +145,7 @@ class ChallengeActivity : ComponentActivity() {
             closable = false,
             topBarStart = {
                 // Subtle note button, only on the first question (or if a note exists).
-                if ((firstQuestion || note.isNotBlank()) && !ui.finished) {
+                if ((firstQuestion || note.isNotBlank()) && !ui.finished && !protect) {
                     Row(
                         Modifier
                             .clip(CircleShape)
@@ -177,7 +181,7 @@ class ChallengeActivity : ComponentActivity() {
             },
             footer = {
                 val left = snap?.skipsLeft ?: 0
-                if (showSkip && left > 0) {
+                if (showSkip && left > 0 && !protect) {
                     Text(
                         "Überspringen · $left übrig",
                         style = MaterialTheme.typography.labelMedium,
@@ -199,10 +203,14 @@ class ChallengeActivity : ComponentActivity() {
             },
             finished = { m ->
                 Finished(
-                    title = "Geschafft.",
-                    text = "${BlockerPrefs.GRACE_MINUTES} Minuten gehören dir.",
+                    title = if (targetKey == StrictRules.KEY_CHANGE) "Bestätigt." else "Geschafft.",
+                    text = when (targetKey) {
+                        StrictRules.KEY_CHANGE -> "Die Änderung gilt ab morgen."
+                        StrictRules.KEY_SETTINGS -> "${StrictRules.SETTINGS_GRACE_MIN} Minuten für die Einstellungen."
+                        else -> "${BlockerPrefs.GRACE_MINUTES} Minuten gehören dir."
+                    },
                     modifier = m,
-                    button = "Weiter zu $label",
+                    button = if (targetKey == StrictRules.KEY_CHANGE) "Fertig" else "Weiter zu $label",
                     onDone = { scope.launch { proceed(note) } },
                     extra = { if (note.isNotBlank()) NoteCard(note) },
                 )
@@ -254,10 +262,14 @@ class ChallengeActivity : ComponentActivity() {
 
     /** Grants the grace period and reveals the blocked app where it was. */
     private suspend fun proceed(note: String) {
-        container.blockerPrefs.grantGrace(targetKey)
+        when (targetKey) {
+            StrictRules.KEY_CHANGE -> container.blockerPrefs.confirmStaged()
+            StrictRules.KEY_SETTINGS -> container.blockerPrefs.grantGrace(targetKey, StrictRules.SETTINGS_GRACE_MIN)
+            else -> container.blockerPrefs.grantGrace(targetKey)
+        }
         if (note.isNotBlank()) deliverNote(note)
         leaving = true
-        ReturnTracker.expect(targetPkg)
+        if (targetPkg != packageName) ReturnTracker.expect(targetPkg)
         finishAndRemoveTask()
         overrideTransitionCompat()
     }
@@ -279,6 +291,8 @@ class ChallengeActivity : ComponentActivity() {
 
     private fun goHome() {
         leaving = true
+        // a confirmation started from our own settings: just go back there (the change is dropped)
+        if (targetKey == StrictRules.KEY_CHANGE) { finishAndRemoveTask(); return }
         startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finishAndRemoveTask()
     }

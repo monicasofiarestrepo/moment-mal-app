@@ -35,6 +35,10 @@ object Workers {
                 .build(),
         )
         wm.enqueueUniquePeriodicWork(
+            "watchdog", ExistingPeriodicWorkPolicy.KEEP,
+            PeriodicWorkRequestBuilder<app.momentmal.blocker.WatchdogWorker>(15, TimeUnit.MINUTES).build(),
+        )
+        wm.enqueueUniquePeriodicWork(
             "auto-backup", ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<BackupWorker>(7, TimeUnit.DAYS).build(),
         )

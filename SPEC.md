@@ -315,6 +315,13 @@ Ejemplos:
 - Desactivar el modo estricto cuesta 30 preguntas y entra en vigor en 24 h.
 - Si el servicio de accesibilidad se desactiva: notificación persistente y registro en las estadísticas.
 
+### Implementación (fase 5)
+- **Protección de ajustes:** en Ajustes / Samsung Accessibility / instalador de paquetes, el servicio lee el texto visible. Si la pantalla trata de Moment mal **y** ofrece apagarlo (desinstalar, forzar detención, desactivar; ES/EN/DE) o es nuestra página de accesibilidad (se reconoce por su descripción), aparece un reto de **30 preguntas** sin botón de salto; después hay 5 min libres. Funciona también en días de pausa. Las pantallas de otras apps no se tocan.
+- **Lockerungen** (subir límites, desbloquear app/sitio, apagar el modo estricto): 30 preguntas → quedan *pendientes* y se aplican desde el día siguiente (se ven en amarillo: „ab morgen frei“). Endurecer (bloquear, bajar límites, encender el modo) es inmediato y cancela lo pendiente que choque.
+- **Deinstallationsschutz:** Geräteadministrator sin políticas; `adb uninstall` / desinstalar falla hasta desactivarlo, y esa pantalla está protegida. Al apagarse el modo estricto (al día siguiente) el administrador se quita solo.
+- **Watchdog:** WorkManager cada 15 min: si la Bedienungshilfe está apagada → notificación fija „Moment mal ist aus“ y el día queda registrado (Statistik). También aplica los cambios pendientes que ya vencieron.
+- Abrir Ajustes desde la propia configuración de Moment mal da 3 min sin reto (para la puesta en marcha).
+
 ---
 
 ## 13. UI / diseño
@@ -357,7 +364,7 @@ Ejemplos:
 | ✅ **2 · Intercepción** | AccessibilityService, ChallengeActivity, gracia de 20 min, salto 3/día, onboarding de permisos Samsung |
 | ✅ **3 · Límites y web** | UsageStats, límites por app y total, fórmula de preguntas extra, bloqueo de dominios en navegadores, días de pausa |
 | ✅ **4 · Sync, stats, backup** | Sync con GitHub, Statistik, export/import, backup automático |
-| **5 · Modo estricto** | Device Admin, protección de Ajustes, watchdog, reglas anti-trampa de límites |
+| ✅ **5 · Modo estricto** | Device Admin, protección de Ajustes, watchdog, reglas anti-trampa de límites |
 
 ---
 
