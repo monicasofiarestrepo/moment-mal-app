@@ -86,6 +86,9 @@ class ChallengeActivity : ComponentActivity() {
     private var overMs = 0L
     private var immediate = false
     private var leaving = false
+    /** Answers carried over from an abandoned challenge for the same app. */
+    private var carried = 0
+    private var vmRef: StudyViewModel? = null
 
     private fun readExtras(i: Intent) {
         targetPkg = i.getStringExtra(EXTRA_PKG).orEmpty()
@@ -95,7 +98,9 @@ class ChallengeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         readExtras(intent)
-        required = intent.getIntExtra(EXTRA_REQUIRED, DEFAULT_REQUIRED)
+        val full = intent.getIntExtra(EXTRA_REQUIRED, DEFAULT_REQUIRED)
+        carried = if (targetKey == StrictRules.KEY_CHANGE) 0 else ChallengeProgress.get(targetKey).coerceAtMost(full - 1)
+        required = full - carried
         overMs = intent.getLongExtra(EXTRA_OVER_MS, 0)
         immediate = intent.getBooleanExtra(EXTRA_IMMEDIATE, false)
         enableEdgeToEdge(
@@ -106,6 +111,7 @@ class ChallengeActivity : ComponentActivity() {
             MomentMalTheme {
                 BackHandler { goHome() }
                 val vm = studyViewModel(SessionMode.Challenge(required), origin = targetKey, key = "challenge")
+                vmRef = vm
                 ChallengeScreen(vm)
             }
         }
@@ -120,7 +126,18 @@ class ChallengeActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         // Left the challenge (Home, recents…): it's abandoned; the next open starts a fresh one.
-        if (!isChangingConfigurations && !leaving) finishAndRemoveTask()
+        if (!isChangingConfigurations && !leaving) {
+            rememberProgress()
+            finishAndRemoveTask()
+        }
+    }
+
+    /** Abandoned mid-challenge: the next attempt for this app only asks for the rest. */
+    private fun rememberProgress() {
+        if (targetKey == StrictRules.KEY_CHANGE) return
+        val ui = vmRef?.ui?.value ?: return
+        if (ui.finished) { ChallengeProgress.clear(targetKey); return }
+        ChallengeProgress.set(targetKey, carried + ui.counted)
     }
 
     private val protect get() = StrictRules.isProtectKey(targetKey)
@@ -174,7 +191,7 @@ class ChallengeActivity : ComponentActivity() {
             header = {
                 Column {
                     Text(
-                        "Moment mal. Erst $required Fragen, dann $label.",
+                        if (carried > 0) "Moment mal. Noch $required Fragen, dann $label." else "Moment mal. Erst $required Fragen, dann $label.",
                         style = MaterialTheme.typography.bodyMedium, color = MM.Muted,
                         modifier = Modifier.padding(top = 10.dp),
                     )
@@ -299,6 +316,7 @@ class ChallengeActivity : ComponentActivity() {
      * blocked app/site again means a new challenge. (Android doesn't let one app close another.)
      */
     private fun closeBoth(note: String) {
+        ChallengeProgress.clear(targetKey)
         if (note.isNotBlank()) deliverNote(note)
         leaving = true
         startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -307,6 +325,7 @@ class ChallengeActivity : ComponentActivity() {
 
     /** Grants the grace period and reveals the blocked app where it was. */
     private suspend fun proceed(note: String) {
+        ChallengeProgress.clear(targetKey)
         when (targetKey) {
             StrictRules.KEY_CHANGE -> container.blockerPrefs.confirmStaged()
             StrictRules.KEY_SETTINGS -> container.blockerPrefs.grantGrace(targetKey, StrictRules.SETTINGS_GRACE_MIN)
@@ -338,6 +357,7 @@ class ChallengeActivity : ComponentActivity() {
         leaving = true
         // a confirmation started from our own settings: just go back there (the change is dropped)
         if (targetKey == StrictRules.KEY_CHANGE) { finishAndRemoveTask(); return }
+        rememberProgress()
         startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finishAndRemoveTask()
     }
@@ -375,4 +395,12 @@ class NoteCopyReceiver : android.content.BroadcastReceiver() {
             android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
         )
     }
+}
+
+/** Per-app answers from abandoned challenges (key: package or "web:<domain>"); cleared once a challenge ends. */
+object ChallengeProgress {
+    private val done = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    fun get(key: String) = done[key] ?: 0
+    fun set(key: String, n: Int) { if (n > 0) done[key] = n else done.remove(key) }
+    fun clear(key: String) { done.remove(key) }
 }

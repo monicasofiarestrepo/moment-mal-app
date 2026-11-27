@@ -59,7 +59,7 @@ app/
    2. ¿Dentro del **periodo de gracia** (20 min) de esa app/dominio? → deja pasar.
    3. Calcula N preguntas (sección 5) → lanza `ChallengeActivity` encima, sin animación.
 3. Al terminar el reto, se vuelve a la app de origen y arranca la gracia de 20 min.
-4. Si sales del reto con Home o Atrás, no entras. La próxima vez que abras la app, el reto empieza de cero.
+4. Si sales del reto con Home o Atrás, no entras. Las respuestas ya dadas cuentan para el próximo intento de esa misma app (p. ej. 3 de 10 → la próxima vez faltan 7, „Noch 7 Fragen“). Al terminar, saltar o „Beide schließen“ el contador de esa app vuelve a cero. No se guarda entre reinicios del proceso.
 
 **Lista inicial de apps:** Instagram, TikTok, Pinterest, Facebook, YouTube, X, Reddit.
 **Lista inicial de dominios:** instagram.com, tiktok.com, pinterest.com, facebook.com, youtube.com, x.com, twitter.com, reddit.com.
